@@ -94,14 +94,14 @@ class SimpleJobTracker:
             ))
             
             conn.commit()
-            logger.info(f"✅ Job {job_id}: {status} at {stage}")
+            logger.info(f"Job {job_id}: {status} at {stage}")
             
         except psycopg2.Error as e:
-            logger.error(f"❌ Database error updating job status: {e}")
+            logger.error(f"Database error updating job status: {e}")
             if conn:
                 conn.rollback()
         except Exception as e:
-            logger.error(f"❌ Failed to update job status: {e}")
+            logger.error(f"Failed to update job status: {e}")
             if conn:
                 conn.rollback()
         finally:
