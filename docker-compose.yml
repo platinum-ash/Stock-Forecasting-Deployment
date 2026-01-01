@@ -134,7 +134,7 @@ services:
     ports:
       - "8009:8009"         
     volumes:
-      - ../ingestion:/app          # ← Mount entire folder as /app
+      - ../ingestion/ingestion:/app          # ← Mount entire folder as /app
       - ingestion-data:/app/data                      # NEW: Persistent data
     networks:
       - timeseries-network
@@ -237,7 +237,7 @@ services:
       forecasting:
         condition: service_healthy
     environment:
-      INGESTION_SERVICE_URL: http://ingestion:8009
+      INGESTION_SERVICE_URL: http://ingestion:8009/yahoo
       STATUS_DATABASE_URL: postgresql://tsuser:ts_password@postgres-pipeline:5432/pipeline
       INGESTION_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@ingestion-timescaledb:5432/timeseries
       PREPROCESSING_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
