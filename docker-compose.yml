@@ -74,6 +74,26 @@ services:
       timeout: 5s
       retries: 5
 
+  ingestion-timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ingestion-timescaledb
+    environment:
+      POSTGRES_USER: tsuser
+      POSTGRES_PASSWORD: ts_password
+      POSTGRES_DB: timeseries
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./k8s/timescaledb-init/ingestion:/docker-entrypoint-initdb.d
+      - ingestion-data:/var/lib/postgresql/data
+    networks:
+      - timeseries-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsuser -d timeseries"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   postgres-pipeline:
     image: docker.io/postgres:15-alpine  # Lightweight PostgreSQL
     container_name: postgres-pipeline
@@ -82,7 +102,7 @@ services:
       POSTGRES_PASSWORD: ts_password
       POSTGRES_DB: pipeline
     ports:
-      - "5433:5432"  # External port 5433 to avoid conflict with main DB
+      - "5434:5432"  # External port 5433 to avoid conflict with main DB
     volumes:
       - postgres-pipeline-data:/var/lib/postgresql/data
       - ./k8s/postgres/pipeline:/docker-entrypoint-initdb.d
@@ -94,6 +114,37 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  ingestion:
+    build:
+      context: ../ingestion
+      dockerfile: Dockerfile
+    container_name: ingestion
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_OUTPUT_TOPIC: data.ingestion.completed
+      KAFKA_ERR_TOPIC: messages.failure
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "8009:8009"         
+    volumes:
+      - ../ingestion/ingestion:/app          # ← Mount entire folder as /app
+      - ingestion-data:/app/data                      # NEW: Persistent data
+    networks:
+      - timeseries-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3.11", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   preprocessing:
     build:
@@ -124,7 +175,7 @@ services:
       - "8000:8000"
     volumes:
       - ../preprocessing-service/preprocessing-service/src:/app/src:ro
-      - ./shared:/app/shared:ro
+      - ./shared:/app/shared
     networks:
       - timeseries-network
     restart: unless-stopped
@@ -160,7 +211,7 @@ services:
       - "8001:8001"
     volumes:
       - forecasting-models:/app/models
-      - ./shared:/app/shared:ro
+      - ./shared:/app/shared
     networks:
       - timeseries-network
     restart: unless-stopped
@@ -195,13 +246,13 @@ services:
       PREPROCESSING_SERVICE_URL: http://preprocessing:8000
       FORECASTING_SERVICE_URL: http://forecasting:8001
       PYTHONUNBUFFERED: 1
-      STREAMLIT_BROWSER_GATHER_USAGE_STATS: false
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
       PYTHONPATH: /app:/shared
     ports:
       - "8501:8501"
     volumes:
-      - ../dashboard-service:/app:ro
-      - ./shared:/app/shared:ro
+      - ../dashboard-service:/app
+      - ./shared:/app/shared
     networks:
       - timeseries-network
     restart: unless-stopped
@@ -242,7 +293,7 @@ services:
       - timeseries-network
     restart: unless-stopped
     volumes:
-      - ./shared:/app/shared:ro
+      - ./shared:/app/shared
 
   # Added from the other compose:
   stats_service:
@@ -260,7 +311,7 @@ services:
       - timeseries-network
     restart: unless-stopped
     volumes:
-      - ./shared:/app/shared:ro
+      - ./shared:/app/shared
 
 networks:
   timeseries-network:
@@ -270,3 +321,4 @@ volumes:
   timescaledb-data:
   forecasting-models:
   postgres-pipeline-data:
+  ingestion-data:
