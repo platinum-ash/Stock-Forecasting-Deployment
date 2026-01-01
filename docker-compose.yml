@@ -54,9 +54,9 @@ services:
       retries: 5
       start_period: 30s
 
-  timescaledb:
+  processing-timescaledb:
     image: timescale/timescaledb:latest-pg15
-    container_name: timescaledb
+    container_name: processing-timescaledb
     environment:
       POSTGRES_USER: tsuser
       POSTGRES_PASSWORD: ts_password
@@ -134,7 +134,7 @@ services:
     ports:
       - "8009:8009"         
     volumes:
-      - ../ingestion/ingestion:/app          # ← Mount entire folder as /app
+      - ../ingestion:/app          # ← Mount entire folder as /app
       - ingestion-data:/app/data                      # NEW: Persistent data
     networks:
       - timeseries-network
@@ -152,14 +152,14 @@ services:
       dockerfile: Dockerfile
     container_name: preprocessing
     depends_on:
-      timescaledb:
+      processing-timescaledb:
         condition: service_healthy
       postgres-pipeline:
         condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       PIPELINE_DATABASE_HOST: postgres-pipeline
       PIPELINE_DATABASE_PORT: 5432
       PIPELINE_DATABASE_NAME: pipeline
@@ -192,14 +192,14 @@ services:
       dockerfile: Dockerfile
     container_name: forecasting
     depends_on:
-      timescaledb:
+      processing-timescaledb:
         condition: service_healthy
       kafka:
         condition: service_healthy
       preprocessing:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_INPUT_TOPIC: data.preprocessing.completed
       KAFKA_OUTPUT_TOPIC: data.forecast.completed
@@ -228,7 +228,7 @@ services:
       dockerfile: Dockerfile
     container_name: dashboard
     depends_on:
-      timescaledb:
+      postgres-pipeline:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -237,11 +237,11 @@ services:
       forecasting:
         condition: service_healthy
     environment:
-      DATABASE_HOST: timescaledb
-      DATABASE_PORT: 5432
-      DATABASE_NAME: timeseries
-      DATABASE_USER: tsuser
-      DATABASE_PASSWORD: ts_password
+      INGESTION_SERVICE_URL: http://ingestion:8009
+      STATUS_DATABASE_URL: postgresql://tsuser:ts_password@postgres-pipeline:5432/pipeline
+      INGESTION_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      PREPROCESSING_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
+      FORECASTING_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       PREPROCESSING_SERVICE_URL: http://preprocessing:8000
       FORECASTING_SERVICE_URL: http://forecasting:8001
