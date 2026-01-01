@@ -160,7 +160,8 @@ services:
       kafka:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
+      PREPROCESSING_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
+      INGESTION_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@ingestion-timescaledb:5432/timeseries
       PIPELINE_DATABASE_HOST: postgres-pipeline
       PIPELINE_DATABASE_PORT: 5432
       PIPELINE_DATABASE_NAME: pipeline
