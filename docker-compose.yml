@@ -65,7 +65,7 @@ services:
       - "5432:5432"
     volumes:
       - timescaledb-data:/var/lib/postgresql/data
-      - ./k8s/timescaledb-init:/docker-entrypoint-initdb.d
+      - ./k8s/timescaledb-init/forecasting/:/docker-entrypoint-initdb.d
     networks:
       - timeseries-network
     healthcheck:
@@ -84,7 +84,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./k8s/timescaledb-init/ingestion:/docker-entrypoint-initdb.d
+      - ./k8s/timescaledb-init/ingestion/:/docker-entrypoint-initdb.d
       - ingestion-data:/var/lib/postgresql/data
     networks:
       - timeseries-network
@@ -121,12 +121,12 @@ services:
       dockerfile: Dockerfile
     container_name: ingestion
     depends_on:
-      timescaledb:
+      ingestion-timescaledb:
         condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@ingestion-timescaledb:5432/timeseries
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_OUTPUT_TOPIC: data.ingestion.completed
       KAFKA_ERR_TOPIC: messages.failure
@@ -239,7 +239,7 @@ services:
     environment:
       INGESTION_SERVICE_URL: http://ingestion:8009
       STATUS_DATABASE_URL: postgresql://tsuser:ts_password@postgres-pipeline:5432/pipeline
-      INGESTION_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      INGESTION_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@ingestion-timescaledb:5432/timeseries
       PREPROCESSING_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       FORECASTING_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -278,7 +278,7 @@ services:
       context: ../time_series_project/anomaly_service
     container_name: anomaly_service
     depends_on:
-      timescaledb:
+      processing-timescaledb:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -301,7 +301,7 @@ services:
       context: ../time_series_project/stats_service
     container_name: stats_service
     depends_on:
-      timescaledb:
+      processing-timescaledb:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
