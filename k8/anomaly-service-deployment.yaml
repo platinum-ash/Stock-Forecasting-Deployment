@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anomaly-service
+  namespace: timeseries
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: anomaly-service
+  template:
+    metadata:
+      labels:
+        app: anomaly-service
+    spec:
+      containers:
+      - name: anomaly-service
+        image: deployment_anomaly_service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: KAFKA_TOPIC
+          value: "data.anomaly_detection.completed"
+        - name: KAFKA_GROUP_ID
+          value: "anomaly-service-group"
+        - name: PYTHONPATH
+          value: "/app:/app/shared"  # Make sure this includes the shared path
+        volumeMounts:
+        - name: shared
+          mountPath: /app/shared
+      volumes:
+        - name: shared
+          configMap:
+            name: anomaly-shared

@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preprocessing
+  namespace: timeseries
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: preprocessing
+  template:
+    metadata:
+      labels:
+        app: preprocessing
+    spec:
+      containers:
+      - name: preprocessing
+        image: localhost:5000/deployment_preprocessing2
+        
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries"
+        - name: PIPELINE_DATABASE_HOST
+          value: "postgres-pipeline"
+        - name: PIPELINE_DATABASE_PORT
+          value: "5432"
+        - name: PIPELINE_DATABASE_NAME
+          value: "pipeline"
+        - name: PIPELINE_DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: PIPELINE_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: KAFKA_INPUT_TOPIC
+          value: "data.ingestion.completed"
+        - name: KAFKA_OUTPUT_TOPIC
+          value: "data.preprocessing.completed"
+        - name: KAFKA_ERR_TOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: KAFKA_ERR_TOPIC
+        - name: PYTHONUNBUFFERED
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: PYTHONUNBUFFERED
+        # Fix PYTHONPATH - remove /app/src if code is at /app
+        - name: PYTHONPATH
+          value: "/app/src:/app"
+        volumeMounts:
+        - name: shared
+          mountPath: /app/shared
+      volumes:
+        - name: shared
+          configMap:
+            name: anomaly-shared
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        

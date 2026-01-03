@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: forecasting
+  namespace: timeseries
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+  selector:
+    app: forecasting
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forecasting
+  namespace: timeseries
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forecasting
+  template:
+    metadata:
+      labels:
+        app: forecasting
+    spec:
+      containers:
+      - name: forecasting
+        image: deployment_forecasting:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: KAFKA_INPUT_TOPIC
+          value: "data.preprocessing.completed"
+        - name: KAFKA_OUTPUT_TOPIC
+          value: "data.forecast.completed"
+        - name: KAFKA_ERR_TOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: KAFKA_ERR_TOPIC
+        - name: PREPROCESSING_SERVICE_URL
+          value: "http://preprocessing:8000"
+        - name: PYTHONUNBUFFERED
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: PYTHONUNBUFFERED
+        - name: PYTHONPATH
+          value: "/app"
+        volumeMounts:
+        - name: models
+          mountPath: /app/models
+        - name: shared
+          mountPath: /app/shared
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: forecasting-models-pvc
+        - name: shared
+          configMap:
+            name: anomaly-shared

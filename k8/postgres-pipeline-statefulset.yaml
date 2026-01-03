@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-pipeline
+  namespace: timeseries
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres-pipeline
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-pipeline
+  namespace: timeseries
+spec:
+  serviceName: postgres-pipeline
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-pipeline
+  template:
+    metadata:
+      labels:
+        app: postgres-pipeline
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          value: "pipeline"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - tsuser
+            - -d
+            - pipeline
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - tsuser
+            - -d
+            - pipeline
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: postgres-pipeline-data-pvc
+      - name: init-scripts
+        configMap:
+          name: postgres-pipeline-init-scripts

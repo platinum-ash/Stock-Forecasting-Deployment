@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: timeseries
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8501
+      targetPort: 8501
+  selector:
+    app: dashboard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: timeseries
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: deployment_dashboard:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8501
+        env:
+        - name: INGESTION_SERVICE_URL
+          value: "http://ingestion:8009/yahoo"
+        - name: STATUS_DATABASE_URL
+          value: "postgresql://tsuser:ts_password@postgres-pipeline:5432/pipeline"
+        - name: INGESTION_DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@ingestion-timescaledb:5432/timeseries"
+        - name: PREPROCESSING_DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries"
+        - name: FORECASTING_DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: PREPROCESSING_SERVICE_URL
+          value: "http://preprocessing:8000"
+        - name: FORECASTING_SERVICE_URL
+          value: "http://forecasting:8001"
+        - name: PYTHONUNBUFFERED
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: PYTHONUNBUFFERED
+        - name: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+          value: "false"
+        - name: PYTHONPATH
+          value: "/app:/shared"
+        volumeMounts:
+        - name: shared
+          mountPath: /app/shared
+      volumes:
+        - name: shared
+          configMap:
+            name: anomaly-shared
+---
