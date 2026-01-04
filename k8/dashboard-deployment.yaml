@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: dashboard
-        image: deployment_dashboard:latest
+        image:  localhost/deployment_dashboard:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8501

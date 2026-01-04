@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: anomaly-service
-        image: deployment_anomaly_service:latest
+        image: localhost/deployment_anomaly_service:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8001

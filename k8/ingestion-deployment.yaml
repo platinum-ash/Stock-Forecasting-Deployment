@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: ingestion
-        image: deployment_ingestion:latest
+        image:  localhost/deployment_ingestion:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8009
@@ -57,23 +57,10 @@ spec:
           mountPath: /app/data
         - name: shared
           mountPath: /app/shared
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8009
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8009
-          initialDelaySeconds: 60
-          periodSeconds: 30
       volumes:
       - name: ingestion-data
         persistentVolumeClaim:
           claimName: ingestion-data-pvc
-        - name: shared
-          configMap:
-            name: anomaly-shared
+      - name: shared          
+        configMap:             
+          name: anomaly-shared 

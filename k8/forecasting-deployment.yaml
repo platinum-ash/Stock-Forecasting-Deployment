@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: forecasting
-        image: deployment_forecasting:latest
+        image:  localhost/deployment_forecasting:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8001
@@ -80,6 +80,6 @@ spec:
       - name: models
         persistentVolumeClaim:
           claimName: forecasting-models-pvc
-        - name: shared
-          configMap:
-            name: anomaly-shared
+      - name: shared          
+        configMap:              
+          name: anomaly-shared 

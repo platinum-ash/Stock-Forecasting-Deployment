@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: stats-service
-        image: deployment_stats_service:latest
+        image: localhost/deployment_stats_service:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8002

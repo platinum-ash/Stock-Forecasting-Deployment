@@ -15,13 +15,15 @@ spec:
     spec:
       containers:
       - name: preprocessing
-        image: localhost:5000/deployment_preprocessing2
-        
+        image:  localhost/deployment_preprocessing:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
         env:
-        - name: DATABASE_URL
+        - name: PREPROCESSING_DATABASE_URL
           value: "postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries"
+        - name: INGESTION_DATABASE_URL
+          value: "postgresql+psycopg2://tsuser:ts_password@ingestion-timescaledb:5432/timeseries"
         - name: PIPELINE_DATABASE_HOST
           value: "postgres-pipeline"
         - name: PIPELINE_DATABASE_PORT
