@@ -274,44 +274,74 @@ services:
     networks:
       - timeseries-network
 
-  # Added from the other compose:
-  anomaly_service:
-    build:
-      context: ../time_series_project/anomaly_service
-    container_name: anomaly_service
-    depends_on:
-      processing-timescaledb:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+  anomaly-status-db:
+    image: postgres:15-alpine
+    container_name: anomaly-status-db
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_TOPIC: data.anomaly_detection.completed
-      KAFKA_GROUP_ID: anomaly-service-group
-    ports:
-      - "8002:8001"
+      POSTGRES_USER: tsuser
+      POSTGRES_PASSWORD: ts_password
+      POSTGRES_DB: anomaly_status
     networks:
       - timeseries-network
-    restart: unless-stopped
+    ports:
+      - "5435:5432"
+    volumes:
+      - anomaly-status-data:/var/lib/postgresql/data
+      - ./k8s/timescaledb-init/status-db-init/anomaly:/docker-entrypoint-initdb.d
+    
+
+  stats-status-db:
+    image: postgres:15-alpine
+    container_name: stats-status-db
+    environment:
+      POSTGRES_USER: tsuser
+      POSTGRES_PASSWORD: ts_password
+      POSTGRES_DB: stats_status
+    networks:
+      - timeseries-network
+    ports:
+      - "5436:5432"
+    volumes:
+      - stats-status-data:/var/lib/postgresql/data
+      - ./k8s/timescaledb-init/status-db-init/stats:/docker-entrypoint-initdb.d
+    
+
+  anomaly_service:
+    build:
+      context: ../anomaly_service
+    container_name: anomaly_service
+    depends_on:
+      - kafka
+      - anomaly-status-db
+    environment:
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      STATUS_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@anomaly-status-db:5432/anomaly_status
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: data.preprocessing.completed
+      KAFKA_GROUP_ID: anomaly-service-group
+      KAFKA_OUTPUT_TOPIC: data.anomaly.completed
+    networks:
+      - timeseries-network
+    ports:
+      - "8001:8001"
     volumes:
       - ./shared:/app/shared
 
-  # Added from the other compose:
   stats_service:
     build:
-      context: ../time_series_project/stats_service
+      context: ../stats_service
     container_name: stats_service
     depends_on:
-      processing-timescaledb:
-        condition: service_healthy
+      - kafka
+      - stats-status-db
     environment:
       DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
-    ports:
-      - "8003:8002"
+      STATUS_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@stats-status-db:5432/stats_status
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - timeseries-network
-    restart: unless-stopped
+    ports:
+      - "8002:8002"
     volumes:
       - ./shared:/app/shared
 
@@ -324,3 +354,6 @@ volumes:
   forecasting-models:
   postgres-pipeline-data:
   ingestion-data:
+  anomaly-status-data:
+  stats-status-data:
+
