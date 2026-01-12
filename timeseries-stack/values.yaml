@@ -1,0 +1,104 @@
+
+nameOverride: ""
+fullnameOverride: ""
+
+createPVs: true
+storageClassName: standard
+
+namespace:
+  create: false
+
+images:
+  pullPolicy: IfNotPresent
+  anomalyService: "aquaknauf/deployment_anomaly_service"
+  dashboard: "aquaknauf/deployment_dashboard"
+  forecasting: "aquaknauf/deployment_forecasting"
+  ingestion: "aquaknauf/deployment_ingestion"
+  preprocessing: "aquaknauf/deployment_preprocessing"
+  statsService: "aquaknauf/deployment_stats_service"
+  zookeeper: "confluentinc/cp-zookeeper:7.5.0"
+  kafka: "confluentinc/cp-kafka:7.5.0"
+  postgres: "postgres:15-alpine"
+  timescaledb: "timescale/timescaledb:latest-pg15"
+  kafkaUi: "provectuslabs/kafka-ui:latest"
+
+services:
+  dashboard:
+    type: LoadBalancer
+    port: 8501
+  kafkaUi:
+    type: LoadBalancer
+    port: 8080
+
+kafka:
+  brokerId: 1
+  numPartitions: 3
+  retentionHours: 168
+  autoCreateTopics: true
+  zookeeper:
+    clientPort: 2181
+
+kafkaConfig:
+  bootstrapServers: "kafka-service:9092"
+  errTopic: "messages.failure"
+  preprocessing:
+    inputTopic: "data.ingestion.completed"
+    outputTopic: "data.preprocessing.completed"
+  forecasting:
+    inputTopic: "data.preprocessing.completed"
+    outputTopic: "data.forecast.completed"
+  anomaly:
+    outputTopic: "data.anomaly_detection.completed"
+
+postgres:
+  pipeline:
+    db: pipeline
+    pvcSize: 5Gi
+    hostPath: /mnt/data/postgres-pipeline
+  credentials:
+    user: tsuser
+    password: ts_password
+
+timescaledb:
+  ingestion:
+    db: timeseries
+    pvcSize: 10Gi
+    hostPath: /mnt/data/ingestion
+  processing:
+    db: timeseries
+    pvcSize: 10Gi
+    hostPath: /mnt/data/timescale
+
+forecasting:
+  modelsPvcSize: 5Gi
+  modelsHostPath: /mnt/data/forecasting
+
+env:
+  pythonUnbuffered: "1"
+  ingestionServiceUrl: "http://ingestion:8009/yahoo"
+  preprocessingServiceUrl: "http://preprocessing:8000"
+  forecastingServiceUrl: "http://forecasting:8001"
+  streamlitGatherUsageStats: "false"
+
+# Shared PVC + init image to distribute shared files to all pods
+shared:
+  pvc:
+    enabled: true
+    name: shared-data-pvc
+    storageClassName: standard
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+  files:
+    image: aquaknauf/shared-files:latest
+    sourcePath: /shared
+    targetPath: /app/shared
+
+# Optional values-backed init scripts (kept for compatibility)
+initScripts:
+  ingestionTimescaledb: {}
+  processingTimescaledb: {}
+
+# Files-backed init scripts (place your files inside chart "files/**")
+# - files/init-scripts/{ingestion,preprocessing,forecasting}/**
+# - files/postgres-init-scripts/**

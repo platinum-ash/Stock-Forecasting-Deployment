@@ -1,0 +1,90 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: preprocessing
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+  selector:
+    app: preprocessing
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preprocessing
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: preprocessing
+  template:
+    metadata:
+      labels:
+        app: preprocessing
+        {{- include "timeseries.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.shared.pvc.enabled }}
+      initContainers:
+{{- include "timeseries.shared.initContainer" . | nindent 8 }}
+      volumes:
+{{- include "timeseries.shared.volumes" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: preprocessing
+          image: {{ .Values.images.preprocessing }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PREPROCESSING_DATABASE_URL
+              value: {{ printf "postgresql+psycopg2://%s:%s@processing-timescaledb:5432/timeseries" .Values.postgres.credentials.user .Values.postgres.credentials.password | quote }}
+            - name: INGESTION_DATABASE_URL
+              value: {{ printf "postgresql+psycopg2://%s:%s@ingestion-timescaledb:5432/timeseries" .Values.postgres.credentials.user .Values.postgres.credentials.password | quote }}
+            - name: PIPELINE_DATABASE_HOST
+              value: postgres-pipeline
+            - name: PIPELINE_DATABASE_PORT
+              value: "5432"
+            - name: PIPELINE_DATABASE_NAME
+              value: {{ .Values.postgres.pipeline.db | quote }}
+            - name: PIPELINE_DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: POSTGRES_USER
+            - name: PIPELINE_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: POSTGRES_PASSWORD
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_INPUT_TOPIC
+              value: {{ .Values.kafkaConfig.preprocessing.inputTopic | quote }}
+            - name: KAFKA_OUTPUT_TOPIC
+              value: {{ .Values.kafkaConfig.preprocessing.outputTopic | quote }}
+            - name: KAFKA_ERR_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_ERR_TOPIC
+            - name: PYTHONUNBUFFERED
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: PYTHONUNBUFFERED
+            - name: PYTHONPATH
+              value: /app/src:/app
+          volumeMounts:
+            {{- if .Values.shared.pvc.enabled }}
+{{- include "timeseries.shared.volumeMounts" . | nindent 12 }}
+            {{- end }}

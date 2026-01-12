@@ -1,0 +1,17 @@
+
+{{- /* Build postgres-init-scripts from files under files/postgres-init-scripts/** */ -}}
+{{- $files := .Files.Glob "files/postgres-init-scripts/**" -}}
+{{- if $files -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+binaryData:
+{{- range $path, $_ := $files }}
+  {{- if not (hasSuffix $path ":Zone.Identifier") }}
+  {{ base $path | replace ":" "_" }}: {{ $.Files.Get $path | b64enc }}
+  {{- end }}
+{{- end }}
+{{- end }}

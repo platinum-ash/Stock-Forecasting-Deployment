@@ -1,0 +1,54 @@
+
+{{- if .Values.createPVs }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-postgres-manual
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storageClassName | quote }}
+  hostPath:
+    path: {{ .Values.postgres.pipeline.hostPath | quote }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-timescale-manual
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storageClassName | quote }}
+  hostPath:
+    path: {{ .Values.timescaledb.processing.hostPath | quote }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-ingestion-manual
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storageClassName | quote }}
+  hostPath:
+    path: {{ .Values.timescaledb.ingestion.hostPath | quote }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-forecasting-manual
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storageClassName | quote }}
+  hostPath:
+    path: {{ .Values.forecasting.modelsHostPath | quote }}
+{{- end }}

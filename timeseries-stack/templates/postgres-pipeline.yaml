@@ -1,0 +1,71 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-pipeline
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres-pipeline
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-pipeline
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  serviceName: postgres-pipeline
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-pipeline
+  template:
+    metadata:
+      labels:
+        app: postgres-pipeline
+        {{- include "timeseries.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.images.postgres }}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.pipeline.db | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.credentials.user }}", "-d", "{{ .Values.postgres.pipeline.db }}"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.credentials.user }}", "-d", "{{ .Values.postgres.pipeline.db }}"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-pipeline-data-pvc
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts

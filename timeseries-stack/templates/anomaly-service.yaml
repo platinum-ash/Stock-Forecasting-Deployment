@@ -1,0 +1,48 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anomaly-service
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: anomaly-service
+  template:
+    metadata:
+      labels:
+        app: anomaly-service
+        {{- include "timeseries.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.shared.pvc.enabled }}
+      initContainers:
+{{- include "timeseries.shared.initContainer" . | nindent 8 }}
+      volumes:
+{{- include "timeseries.shared.volumes" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: anomaly-service
+          image: {{ .Values.images.anomalyService }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - containerPort: 8001
+          env:
+            - name: DATABASE_URL
+              value: {{ printf "postgresql+psycopg2://%s:%s@processing-timescaledb:5432/timeseries" .Values.postgres.credentials.user .Values.postgres.credentials.password | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_TOPIC
+              value: {{ .Values.kafkaConfig.anomaly.outputTopic | quote }}
+            - name: KAFKA_GROUP_ID
+              value: anomaly-service-group
+            - name: PYTHONPATH
+              value: /app:/app/shared
+          volumeMounts:
+            {{- if .Values.shared.pvc.enabled }}
+{{- include "timeseries.shared.volumeMounts" . | nindent 12 }}
+            {{- end }}

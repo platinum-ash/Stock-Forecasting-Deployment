@@ -1,0 +1,44 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-ui
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.services.kafkaUi.type }}
+  ports:
+    - port: {{ .Values.services.kafkaUi.port }}
+      targetPort: 8080
+  selector:
+    app: kafka-ui
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-ui
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-ui
+  template:
+    metadata:
+      labels:
+        app: kafka-ui
+        {{- include "timeseries.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: kafka-ui
+          image: {{ .Values.images.kafkaUi }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KAFKA_CLUSTERS_0_NAME
+              value: local
+            - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+              value: {{ .Values.kafkaConfig.bootstrapServers | quote }}
+            - name: KAFKA_CLUSTERS_0_ZOOKEEPER
+              value: zookeeper-service:{{ .Values.kafka.zookeeper.clientPort }}

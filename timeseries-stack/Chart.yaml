@@ -1,0 +1,7 @@
+
+apiVersion: v2
+name: timeseries-stack
+description: Helm chart for a time-series pipeline ingestion → preprocessing → forecasting → anomaly-service, with Kafka, Zookeeper, TimescaleDBs, Postgres, Kafka-UI, and a Streamlit dashboard. Shared assets delivered via PVC + initContainer image.
+type: application
+version: 0.2.0
+appVersion: "1.0.0"

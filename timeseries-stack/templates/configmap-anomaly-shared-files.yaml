@@ -1,0 +1,15 @@
+
+{{- /* Build anomaly-shared from files under files/anomaly-shared/** */ -}}
+{{- $files := .Files.Glob "files/anomaly-shared/**" -}}
+{{- if $files -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anomaly-shared
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+binaryData:
+{{- range $path, $_ := $files }}
+  {{ base $path }}: {{ $.Files.Get $path | b64enc }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,11 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+data:
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.kafkaConfig.bootstrapServers | quote }}
+  PYTHONUNBUFFERED: {{ .Values.env.pythonUnbuffered | quote }}
+  KAFKA_ERR_TOPIC: {{ .Values.kafkaConfig.errTopic | quote }}
