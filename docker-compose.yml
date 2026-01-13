@@ -117,7 +117,7 @@ services:
 
   ingestion:
     build:
-      context: ../ingestion
+      context: ../ingestion-service
       dockerfile: Dockerfile
     container_name: ingestion
     depends_on:
@@ -134,7 +134,6 @@ services:
     ports:
       - "8009:8009"         
     volumes:
-      - ../ingestion/ingestion:/app          # ← Mount entire folder as /app
       - ingestion-data:/app/data  
       - ./shared:/app/shared                    
     networks:
@@ -190,7 +189,7 @@ services:
 
   forecasting:
     build:
-      context: ../forecasting_service
+      context: ../forecasting-service
       dockerfile: Dockerfile
     container_name: forecasting
     depends_on:
@@ -308,13 +307,14 @@ services:
 
   anomaly_service:
     build:
-      context: ../anomaly_service
+      context: ../time_series_project/anomaly_service
     container_name: anomaly_service
     depends_on:
+      - preprocessing
       - kafka
       - anomaly-status-db
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       STATUS_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@anomaly-status-db:5432/anomaly_status
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: data.preprocessing.completed
@@ -323,25 +323,25 @@ services:
     networks:
       - timeseries-network
     ports:
-      - "8001:8001"
+      - "8003:8001"
     volumes:
       - ./shared:/app/shared
 
   stats_service:
     build:
-      context: ../stats_service
+      context: ../time_series_project/stats_service
     container_name: stats_service
     depends_on:
       - kafka
       - stats-status-db
     environment:
-      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@timescaledb:5432/timeseries
+      DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@processing-timescaledb:5432/timeseries
       STATUS_DATABASE_URL: postgresql+psycopg2://tsuser:ts_password@stats-status-db:5432/stats_status
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - timeseries-network
     ports:
-      - "8002:8002"
+      - "8004:8001"
     volumes:
       - ./shared:/app/shared
 

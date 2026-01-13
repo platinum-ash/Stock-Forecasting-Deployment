@@ -1,7 +1,6 @@
 """
 Lightweight job tracker for pipeline status updates.
-No containers needed - just import and use!
-Works with any PostgreSQL database.
+Tracks each stage separately for better visibility.
 """
 import logging
 import psycopg2
@@ -10,12 +9,10 @@ from psycopg2.extras import Json
 from typing import Optional, Dict, Any
 import os
 
-
 logger = logging.getLogger(__name__)
 
-
 class SimpleJobTracker:
-    """Standalone job tracker - works without dependency injection"""
+    """Standalone job tracker - tracks each pipeline stage separately"""
     
     _pool = None
     
@@ -45,20 +42,38 @@ class SimpleJobTracker:
         cls,
         job_id: str,
         series_id: str,
-        status: str,  # 'running', 'completed', 'failed'
-        stage: str,   # 'ingestion', 'preprocessing', 'forecasting', 'anomaly'
+        status: str,  # 'pending', 'running', 'completed', 'failed'
+        stage: str,   # 'ingestion', 'preprocessing', 'forecasting', 'anomaly', 'stats'
         error_message: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ):
         """
-        Update pipeline job status in database.
+        Update pipeline stage status in database.
+        Each stage gets its own row - no more overwriting!
         
         Usage:
+            # Start ingestion
             SimpleJobTracker.update_status(
                 job_id='job123',
                 series_id='AAPL',
                 status='running',
                 stage='ingestion'
+            )
+            
+            # Complete ingestion
+            SimpleJobTracker.update_status(
+                job_id='job123',
+                series_id='AAPL',
+                status='completed',
+                stage='ingestion'
+            )
+            
+            # Start preprocessing
+            SimpleJobTracker.update_status(
+                job_id='job123',
+                series_id='AAPL',
+                status='running',
+                stage='preprocessing'
             )
         """
         conn = None
@@ -68,33 +83,37 @@ class SimpleJobTracker:
             conn = pool_instance.getconn()
             cursor = conn.cursor()
             
-            # Use psycopg2.extras.Json for proper JSON handling
+            # Insert or update specific stage
             cursor.execute("""
-                INSERT INTO pipeline_jobs 
-                    (job_id, series_id, status, stage, error_message, metadata, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT (job_id) 
+                INSERT INTO pipeline_job_stages 
+                    (job_id, series_id, stage, status, error_message, metadata, started_at, completed_at)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 
+                        CASE WHEN %s IN ('completed', 'failed') THEN CURRENT_TIMESTAMP ELSE NULL END)
+                ON CONFLICT (job_id, stage) 
                 DO UPDATE SET
                     status = EXCLUDED.status,
-                    stage = EXCLUDED.stage,
                     error_message = EXCLUDED.error_message,
                     metadata = CASE 
-                        WHEN EXCLUDED.metadata IS NOT NULL AND pipeline_jobs.metadata IS NOT NULL 
-                        THEN pipeline_jobs.metadata || EXCLUDED.metadata
-                        ELSE COALESCE(EXCLUDED.metadata, pipeline_jobs.metadata)
+                        WHEN EXCLUDED.metadata IS NOT NULL AND pipeline_job_stages.metadata IS NOT NULL 
+                        THEN pipeline_job_stages.metadata || EXCLUDED.metadata
+                        ELSE COALESCE(EXCLUDED.metadata, pipeline_job_stages.metadata)
                     END,
-                    updated_at = CURRENT_TIMESTAMP
+                    completed_at = CASE 
+                        WHEN EXCLUDED.status IN ('completed', 'failed') THEN CURRENT_TIMESTAMP 
+                        ELSE pipeline_job_stages.completed_at
+                    END
             """, (
                 job_id,
                 series_id,
-                status,
                 stage,
+                status,
                 error_message,
-                Json(metadata) if metadata else None
+                Json(metadata) if metadata else None,
+                status
             ))
             
             conn.commit()
-            logger.info(f"Job {job_id}: {status} at {stage}")
+            logger.info(f"Job {job_id} - Stage {stage}: {status}")
             
         except psycopg2.Error as e:
             logger.error(f"Database error updating job status: {e}")
@@ -109,6 +128,21 @@ class SimpleJobTracker:
                 cursor.close()
             if conn:
                 pool_instance.putconn(conn)
+    
+    @classmethod
+    def start_stage(cls, job_id: str, series_id: str, stage: str, metadata: Optional[Dict[str, Any]] = None):
+        """Convenience method to start a stage"""
+        cls.update_status(job_id, series_id, 'running', stage, metadata=metadata)
+    
+    @classmethod
+    def complete_stage(cls, job_id: str, series_id: str, stage: str, metadata: Optional[Dict[str, Any]] = None):
+        """Convenience method to complete a stage"""
+        cls.update_status(job_id, series_id, 'completed', stage, metadata=metadata)
+    
+    @classmethod
+    def fail_stage(cls, job_id: str, series_id: str, stage: str, error_message: str, metadata: Optional[Dict[str, Any]] = None):
+        """Convenience method to fail a stage"""
+        cls.update_status(job_id, series_id, 'failed', stage, error_message=error_message, metadata=metadata)
     
     @classmethod
     def close_pool(cls):
