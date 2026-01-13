@@ -1,0 +1,3 @@
+kubectl create configmap postgres-pipeline-init-scripts --from-file=postgres/pipeline/01_create_pipeline_table.sql -n timeseries
+kubectl create configmap timescaledb-init-scripts --from-file=preprocessing/01_create_tables.sql -n timeseries
+kubectl create configmap ingestion-init-scripts --from-file=ingestion/01_create_tables.sql -n timeseries

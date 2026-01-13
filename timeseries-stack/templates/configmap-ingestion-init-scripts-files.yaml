@@ -1,0 +1,26 @@
+
+{{- /* Build ingestion-init-scripts from files under files/init-scripts/{ingestion,preprocessing,forecasting}/** */ -}}
+{{- $a := .Files.Glob "files/init-scripts/ingestion/**" -}}
+{{- $b := .Files.Glob "files/init-scripts/preprocessing/**" -}}
+{{- $c := .Files.Glob "files/init-scripts/forecasting/**" -}}
+{{- $all := list $a $b $c -}}
+{{- $merged := dict -}}
+{{- range $set := $all }}
+  {{- range $path, $_ := $set }}
+    {{- $_ := set $merged $path true -}}
+  {{- end }}
+{{- end }}
+{{- if $merged -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingestion-init-scripts
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+binaryData:
+{{- range $path, $_ := $merged }}
+  {{- if not (hasSuffix $path ":Zone.Identifier") }}
+  {{ base $path | replace ":" "_" }}: {{ $.Files.Get $path | b64enc }}
+  {{- end }}
+{{- end }}
+{{- end }}

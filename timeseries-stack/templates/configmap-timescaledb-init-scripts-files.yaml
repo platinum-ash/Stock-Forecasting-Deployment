@@ -1,0 +1,27 @@
+
+{{- /* Build timescaledb-init-scripts from files under files/init-scripts/processing/** */ -}}
+{{- $files := .Files.Glob "files/init-scripts/processing/**" -}}
+{{- if $files -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timescaledb-init-scripts
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+binaryData:
+{{- range $path, $_ := $files }}
+  {{- if not (hasSuffix $path ":Zone.Identifier") }}
+  {{ base $path | replace ":" "_" }}: {{ $.Files.Get $path | b64enc }}
+  {{- end }}
+{{- end }}
+{{- else }}
+# Render a harmless placeholder so the mount always exists
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timescaledb-init-scripts
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+data:
+  placeholder: ""
+{{- end }}

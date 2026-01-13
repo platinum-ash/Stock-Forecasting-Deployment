@@ -1,0 +1,26 @@
+
+Thank you for installing {{ .Chart.Name }} (v{{ .Chart.Version }})!
+
+Namespace: {{ .Release.Namespace }}
+
+Endpoints:
+- Dashboard:    svc/dashboard.{{ .Release.Namespace }} (port {{ .Values.services.dashboard.port }})
+- Kafka UI:     svc/kafka-ui.{{ .Release.Namespace }} (port {{ .Values.services.kafkaUi.port }})
+- Kafka broker: kafka-service.{{ .Release.Namespace }}:9092
+- Zookeeper:    zookeeper-service.{{ .Release.Namespace }}:{{ .Values.kafka.zookeeper.clientPort }}
+- Databases:
+  * Ingestion TimescaleDB:   svc/ingestion-timescaledb:5432
+  * Processing TimescaleDB:  svc/processing-timescaledb:5432
+  * Pipeline Postgres:       svc/postgres-pipeline:5432
+
+Init scripts by files (optional):
+- Place SQL files under files/init-scripts/{ingestion,preprocessing,forecasting}/** for ConfigMap ingestion-init-scripts
+- Place SQL files under files/postgres-init-scripts/** for ConfigMap postgres-init-scripts
+
+Shared files strategy:
+- PVC {{ .Values.shared.pvc.name }} stores shared content
+- InitContainer copies from image {{ .Values.shared.files.image }} → {{ .Values.shared.files.targetPath }} (read-only) in your pods
+
+Tips:
+- If LoadBalancer IPs are not assigned, set services.*.type=NodePort in values.yaml.
+- Use `helm template` and `helm lint` to inspect rendered output before applying.

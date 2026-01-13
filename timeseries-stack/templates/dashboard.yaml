@@ -1,0 +1,77 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.services.dashboard.type }}
+  ports:
+    - port: {{ .Values.services.dashboard.port }}
+      targetPort: 8501
+  selector:
+    app: dashboard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+        {{- include "timeseries.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.shared.pvc.enabled }}
+      initContainers:
+{{- include "timeseries.shared.initContainer" . | nindent 8 }}
+      volumes:
+{{- include "timeseries.shared.volumes" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: dashboard
+          image: {{ .Values.images.dashboard }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - containerPort: 8501
+          env:
+            - name: INGESTION_SERVICE_URL
+              value: {{ .Values.env.ingestionServiceUrl | quote }}
+            - name: STATUS_DATABASE_URL
+              value: {{ printf "postgresql://%s:%s@postgres-pipeline:5432/%s" .Values.postgres.credentials.user .Values.postgres.credentials.password .Values.postgres.pipeline.db | quote }}
+            - name: INGESTION_DATABASE_URL
+              value: {{ printf "postgresql+psycopg2://%s:%s@ingestion-timescaledb:5432/timeseries" .Values.postgres.credentials.user .Values.postgres.credentials.password | quote }}
+            - name: PREPROCESSING_DATABASE_URL
+              value: {{ printf "postgresql+psycopg2://%s:%s@processing-timescaledb:5432/timeseries" .Values.postgres.credentials.user .Values.postgres.credentials.password | quote }}
+            - name: FORECASTING_DATABASE_URL
+              value: {{ printf "postgresql+psycopg2://%s:%s@processing-timescaledb:5432/timeseries" .Values.postgres.credentials.user .Values.postgres.credentials.password | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: PREPROCESSING_SERVICE_URL
+              value: {{ .Values.env.preprocessingServiceUrl | quote }}
+            - name: FORECASTING_SERVICE_URL
+              value: {{ .Values.env.forecastingServiceUrl | quote }}
+            - name: PYTHONUNBUFFERED
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: PYTHONUNBUFFERED
+            - name: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+              value: {{ .Values.env.streamlitGatherUsageStats | quote }}
+            - name: PYTHONPATH
+              value: /app:/shared
+          volumeMounts:
+            {{- if .Values.shared.pvc.enabled }}
+{{- include "timeseries.shared.volumeMounts" . | nindent 12 }}
+            {{- end }}

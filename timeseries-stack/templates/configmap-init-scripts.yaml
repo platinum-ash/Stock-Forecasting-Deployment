@@ -1,0 +1,28 @@
+
+{{- if .Values.initScripts.ingestionTimescaledb }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingestion-init-scripts
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+data:
+{{- range $k, $v := .Values.initScripts.ingestionTimescaledb }}
+  {{ $k }}: |-
+{{ $v | indent 4 }}
+{{- end }}
+---
+{{- end }}
+{{- if .Values.initScripts.processingTimescaledb }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timescaledb-init-scripts
+  labels:
+    {{- include "timeseries.labels" . | nindent 4 }}
+data:
+{{- range $k, $v := .Values.initScripts.processingTimescaledb }}
+  {{ $k }}: |-
+{{ $v | indent 4 }}
+{{- end }}
+{{- end }}
